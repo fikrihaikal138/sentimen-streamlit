@@ -1,5 +1,3 @@
-
-
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -118,7 +116,6 @@ if menu == "📈 Evaluasi Metrik":
     st.pyplot(fig)
 
 # Menu: Confusion Matrix
-# Menu: Confusion Matrix
 elif menu == "📊 Confusion Matrix":
     st.subheader("📊 Confusion Matrix")
     _, _, _, _, cm, _ = evaluate_model(svm_model, X_test, y_test)
@@ -129,7 +126,7 @@ elif menu == "📊 Confusion Matrix":
                 xticklabels=['Positif', 'Negatif'], 
                 yticklabels=['Positif', 'Negatif'], ax=ax)
 
-    # Set font size for annotations
+    # Set font size for annotationsS
     ax.tick_params(labelsize=5)  # Change size of tick labels
     ax.set_xlabel("Prediksi", fontsize=5)  # Font size for x label
     ax.set_ylabel("Aktual", fontsize=5)  # Font size for y label
@@ -162,31 +159,94 @@ elif menu == "💬 Wordcloud":
         st.pyplot(fig2)
 
 # Menu: Apriori
+ 
 elif menu == "📎 Asosiasi Kata (Apriori)":
     st.subheader("📎 Analisis Asosiasi Kata (Apriori) Berdasarkan Sentimen")
 
-    for sentimen in ['Positif', 'Negatif']:
-        st.markdown(f"**Asosiasi Kata - {sentimen}**")
+    # Pastikan data sudah dimuat
+    if 'data' not in globals() or data.empty:
+        st.error("❌ Data belum dimuat. Silakan jalankan menu preprocessing terlebih dahulu.")
+    else:
+        total_ulasan = len(data)
+        st.write(f"📊 Total ulasan: **{total_ulasan}**")
 
-        # Ambil hanya data berdasarkan label sentimen
-        subset = data[data['Sentimen'] == sentimen]['stemming'].apply(lambda x: x.split())
-
-        # Konversi ke format transaksi
-        te = TransactionEncoder()
-        te_ary = te.fit(subset).transform(subset)
-        df_trans = pd.DataFrame(te_ary, columns=te.columns_)
-
-        # Apriori: dengan minimum support 2%
-        freq_item = apriori(df_trans, min_support=0.02, use_colnames=True)
-
-        # Aturan asosiasi: berbasis confidence minimal 50%
-        rules = association_rules(freq_item, metric="confidence", min_threshold=0.5)
-
-        # Tampilkan hanya kolom penting dan urutkan berdasarkan lift
-        st.dataframe(rules[['antecedents', 'consequents', 'support', 'confidence', 'lift']].sort_values(by='lift', ascending=False))
+        # Slider Minimum Support (0.005 - 0.05)
+        min_sup = st.slider(
+        "🔧 Minimum Support:",
+        min_value=0.005,
+        max_value=0.05,
+        value=0.01,   # nilai default
+        step=0.001,   # langkah kecil biar presisi
+        format="%.3f"
+        )
 
 
-# Menu: Prediksi Sentimen Baru
+        # Slider Minimum Confidence (0.50 - 0.90)
+        min_conf = st.slider(
+            "🔧 Minimum Confidence:",
+            min_value=0.50,
+            max_value=0.90,
+            value=0.60,  # default 50%
+            step=0.01,
+            format="%.2f"
+        )
+
+        # Stopwords tambahan
+        extra_stopwords = {
+            'bisa', 'sudah', 'yang', 'akan', 'jadi', 'karena', 'untuk', 'e', 'yg',
+            'dengan', 'pada', 'agar', 'dari', 'ke', 'di', 'itu', 'ini'
+        }
+
+        # Loop untuk setiap sentimen
+        for sentimen in ['Positif', 'Negatif']:
+            st.markdown(f"### 🔹 Asosiasi Kata - {sentimen}")
+
+            # Ambil data sesuai sentimen
+            subset = data[data['Sentimen'] == sentimen]['stemming'].dropna().apply(lambda x: x.split())
+            subset = subset.apply(lambda tokens: [w for w in tokens if w not in extra_stopwords])
+
+            if subset.empty:
+                st.warning(f"⚠ Tidak ada data untuk sentimen {sentimen}")
+                continue
+
+            # Konversi ke format transaksi
+            te = TransactionEncoder()
+            te_ary = te.fit(subset).transform(subset)
+            df_trans = pd.DataFrame(te_ary, columns=te.columns_)
+
+            # Jalankan Apriori
+            freq_item = apriori(df_trans, min_support=min_sup, use_colnames=True)
+
+            if freq_item.empty:
+                st.info(f"❗ Tidak ditemukan itemset dengan support ≥ {min_sup} untuk sentimen {sentimen}")
+                continue
+
+            # Buat aturan asosiasi
+            rules = association_rules(freq_item, metric="confidence", min_threshold=min_conf)
+
+            # Filter aturan yang valid dan lift ≥ 2
+            rules = rules[
+                (rules['antecedents'].apply(len) > 0) &
+                (rules['consequents'].apply(len) > 0) &
+                (rules['lift'] >= 1)
+
+            ]
+
+            if not rules.empty:
+                rules['antecedents'] = rules['antecedents'].apply(lambda x: ', '.join(list(x)))
+                rules['consequents'] = rules['consequents'].apply(lambda x: ', '.join(list(x)))
+
+                # Urutkan berdasarkan lift tertinggi
+                rules_sorted = rules.sort_values(by='lift', ascending=False).head(10).reset_index(drop=True)
+
+                st.write(f"(Support ≥ {min_sup}, Confidence ≥ {min_conf}, Lift ≥ 2)")
+                st.dataframe(rules_sorted[['antecedents', 'consequents', 'support', 'confidence', 'lift']])
+            else:
+                st.info(f"❗ Tidak ditemukan aturan asosiasi untuk sentimen {sentimen} "
+                        f"dengan Support {min_sup}, Confidence {min_conf}, dan Lift ≥ 2")
+
+
+
 
 # Menu: Prediksi Sentimen Baru
 elif menu == "🔍 Prediksi Ulasan Baru":
@@ -201,8 +261,12 @@ elif menu == "🔍 Prediksi Ulasan Baru":
             else:
                 df_new = pd.read_excel(uploaded_file)
 
+            # Display total number of reviews
+            total_reviews = df_new.shape[0]
+            st.write(f"📊 Total Ulasan: {total_reviews}")
             st.write("📋 Kolom ditemukan:", df_new.columns.tolist())
             st.dataframe(df_new.head())
+
 
             # Pastikan kolom 'score' ada dan konversi ke numerik
             if 'score' in df_new.columns:
@@ -217,7 +281,7 @@ elif menu == "🔍 Prediksi Ulasan Baru":
 
             df_new = df_new.dropna(subset=['ulasan'])
 
-            # Preprocessing
+            # Preprocessing AAAAAAAAAAAAAAAAAA  "JHh
             df_new['clean'] = df_new['ulasan'].apply(preprocess_text)
             tfidf_new = tfidf.transform(df_new['clean'])
 
@@ -226,7 +290,7 @@ elif menu == "🔍 Prediksi Ulasan Baru":
 
             # Tampilkan hasil
             st.subheader("📄 Contoh Hasil Prediksi")
-            st.dataframe(df_new[['ulasan', 'score', 'label', 'Prediksi_SVM']].head(10))
+            st.dataframe(df_new[['ulasan', 'score', 'label', 'Prediksi_SVM']].head(30))
 
             # Visualisasi distribusi
             st.subheader("📊 Distribusi Prediksi Sentimen")
@@ -278,13 +342,41 @@ elif menu == "🔍 Prediksi Ulasan Baru":
 
             # Aturan asosiasi kata (Apriori) dari hasil prediksi
             st.subheader("📎 Asosiasi Kata dari Hasil Prediksi (Apriori)")
-            min_sup = st.slider("🔧 Minimum Support:", min_value=0.01, max_value=0.2, value=0.05, step=0.01)
+            # Slider Minimum Support (0.005 - 0.05)
+            min_sup = st.slider(
+                "🔧 Minimum Support:",
+                min_value=0.005,
+                max_value=0.05,
+                value=0.01,   # nilai default
+                step=0.001,   # langkah kecil biar presisi
+                format="%.3f"
+            )
+            # Slider Minimum Confidence (0.50 - 0.90)
+            min_conf = st.slider(
+                "🔧 Minimum Confidence:",
+                min_value=0.50,
+                max_value=0.90,
+                value=0.60,  
+                step=0.01,
+                format="%.2f"
+            )
 
             for sentimen in ['Positif', 'Negatif']:
                 st.markdown(f"#### 💬 {sentimen}")
                 subset = df_new[df_new['Prediksi_SVM'] == sentimen]
 
-                transaksi = [row.split() for row in subset['clean'] if isinstance(row, str)]
+               
+                extra_stopwords = {
+                    'bisa', 'sudah', 'yang', 'akan', 'jadi', 'karena', 'untuk', 'e', 'yg',
+                    'dengan', 'pada', 'agar', 'dari', 'ke', 'di', 'itu', 'ini', 'dan', 'atau','tidak','ada'
+                }
+
+                transaksi = [
+                    [w for w in row.split() if w not in extra_stopwords]
+                    for row in subset['clean']
+                    if isinstance(row, str)
+                ]
+
 
                 st.caption(f"Jumlah transaksi (prediksi {sentimen}): {len(transaksi)}")
 
@@ -296,7 +388,7 @@ elif menu == "🔍 Prediksi Ulasan Baru":
                     freq_item = apriori(df_trans, min_support=min_sup, use_colnames=True)
                     rules = association_rules(freq_item, metric="lift", min_threshold=1.0)
 
-                    # Tampilkan aturan tanpa interpretasi
+                    
                     if not rules.empty:
                         st.dataframe(rules[['antecedents', 'consequents', 'support', 'confidence', 'lift']].sort_values(by="lift", ascending=False).head(10))
                     else:
