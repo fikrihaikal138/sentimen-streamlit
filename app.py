@@ -304,6 +304,23 @@ elif menu == "🔍 Prediksi Ulasan Baru":
             )
             st.plotly_chart(fig_svm, use_container_width=True)
 
+            # Word Cloud for Positive Sentiment
+            st.subheader("☁️ Word Cloud untuk Sentimen Positif")
+            positive_reviews = ' '.join(df_new[df_new['Prediksi_SVM'] == 'Positif']['clean'])
+            wordcloud_pos = WordCloud(width=800, height=400, background_color='white').generate(positive_reviews)
+            plt.figure(figsize=(10, 5))
+            plt.imshow(wordcloud_pos, interpolation='bilinear')
+            plt.axis('off')
+            st.pyplot(plt)
+            # Word Cloud for Negative Sentiment
+            st.subheader("☁️ Word Cloud untuk Sentimen Negatif")
+            negative_reviews = ' '.join(df_new[df_new['Prediksi_SVM'] == 'Negatif']['clean'])
+            wordcloud_neg = WordCloud(width=800, height=400, background_color='white').generate(negative_reviews)
+            plt.figure(figsize=(10, 5))
+            plt.imshow(wordcloud_neg, interpolation='bilinear')
+            plt.axis('off')
+            st.pyplot(plt)
+    
             # Confusion Matrix dan Evaluasi
             if 'label' in df_new.columns:
                 df_eval = df_new.dropna(subset=['label'])
@@ -419,3 +436,4 @@ elif menu == "🏠 Dashboard":
     st.plotly_chart(fig2, use_container_width=True)
     
   
+
