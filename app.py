@@ -9,7 +9,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
 from mlxtend.frequent_patterns import apriori, association_rules
 from mlxtend.preprocessing import TransactionEncoder
+from wordcloud import WordCloud, STOPWORDS
 import joblib
+
 
 st.set_page_config("Analisis Sentimen Tiket.com - SVM & Asosiasi", layout="wide")
 
@@ -102,6 +104,7 @@ data = load_data()
 svm_model, tfidf = load_model_vectorizer()
 X_train, X_test, y_train, y_test, train_texts, test_texts = prepare_eval_data(data)
 
+
 # Menu: Evaluasi Metrik
 if menu == "📈 Evaluasi Metrik":
     st.subheader("📈 Evaluasi Kinerja Model SVM")
@@ -141,18 +144,37 @@ elif menu == "📊 Confusion Matrix":
 elif menu == "💬 Wordcloud":
     st.subheader("💬 WordCloud Ulasan Positif dan Negatif")
     col1, col2 = st.columns(2)
+
+    # === definisi stopwords ===
+    from wordcloud import STOPWORDS
+    custom_stopwords = set(STOPWORDS)
+    custom_stopwords.update([
+       "yg","yang", "aja", "bisa", "dong", "nya", "sy","ga","gak",   # contoh kata tambahan
+    ])
+
     with col1:
         st.markdown("**WordCloud - Positif**")
         pos_text = " ".join(data[data['Sentimen']=='Positif']['stemming'])
-        wc_pos = WordCloud(width=600, height=300, background_color="white").generate(pos_text)
+        wc_pos = WordCloud(
+            width=600,
+            height=300,
+            background_color="white",
+            stopwords=custom_stopwords
+        ).generate(pos_text)
         fig1, ax1 = plt.subplots(figsize=(6, 3))
         ax1.imshow(wc_pos, interpolation='bilinear')
         ax1.axis("off")
         st.pyplot(fig1)
+
     with col2:
         st.markdown("**WordCloud - Negatif**")
         neg_text = " ".join(data[data['Sentimen']=='Negatif']['stemming'])
-        wc_neg = WordCloud(width=600, height=300, background_color="white").generate(neg_text)
+        wc_neg = WordCloud(
+            width=600,
+            height=300,
+            background_color="white",
+            stopwords=custom_stopwords
+        ).generate(neg_text)
         fig2, ax2 = plt.subplots(figsize=(6, 3))
         ax2.imshow(wc_neg, interpolation='bilinear')
         ax2.axis("off")
@@ -281,7 +303,7 @@ elif menu == "🔍 Prediksi Ulasan Baru":
 
             df_new = df_new.dropna(subset=['ulasan'])
 
-            # Preprocessing AAAAAAAAAAAAAAAAAA  "JHh
+            # Preprocessing
             df_new['clean'] = df_new['ulasan'].apply(preprocess_text)
             tfidf_new = tfidf.transform(df_new['clean'])
 
@@ -290,7 +312,7 @@ elif menu == "🔍 Prediksi Ulasan Baru":
 
             # Tampilkan hasil
             st.subheader("📄 Contoh Hasil Prediksi")
-            st.dataframe(df_new[['ulasan', 'score', 'label', 'Prediksi_SVM']].head(30))
+            st.dataframe(df_new[['ulasan', 'score', 'label', 'Prediksi_SVM']].head(101))
 
             # Visualisasi distribusi
             st.subheader("📊 Distribusi Prediksi Sentimen")
@@ -304,23 +326,35 @@ elif menu == "🔍 Prediksi Ulasan Baru":
             )
             st.plotly_chart(fig_svm, use_container_width=True)
 
-            # Word Cloud for Positive Sentiment
+           # Word Cloud untuk Sentimen Positif
             st.subheader("☁️ Word Cloud untuk Sentimen Positif")
             positive_reviews = ' '.join(df_new[df_new['Prediksi_SVM'] == 'Positif']['clean'])
-            wordcloud_pos = WordCloud(width=800, height=400, background_color='white').generate(positive_reviews)
+            wordcloud_pos = WordCloud(
+                width=800,
+                height=400,
+                background_color='white',
+                stopwords=set(STOPWORDS).union({"dan", "di", "tiket", "aja", "bisa", "dong", "nya", "sy", "yg", "gk","ada","dan"})
+            ).generate(positive_reviews)
             plt.figure(figsize=(10, 5))
             plt.imshow(wordcloud_pos, interpolation='bilinear')
             plt.axis('off')
             st.pyplot(plt)
-            # Word Cloud for Negative Sentiment
+
+            # Word Cloud untuk Sentimen Negatif
             st.subheader("☁️ Word Cloud untuk Sentimen Negatif")
             negative_reviews = ' '.join(df_new[df_new['Prediksi_SVM'] == 'Negatif']['clean'])
-            wordcloud_neg = WordCloud(width=800, height=400, background_color='white').generate(negative_reviews)
+            wordcloud_neg = WordCloud(
+                width=800,
+                height=400,
+                background_color='white',
+                stopwords=set(STOPWORDS).union({"dan", "di", "tiket", "aja", "bisa", "dong", "nya", "sy", "yg", "gk","ada","tidak","yang","ga"})
+            ).generate(negative_reviews)
             plt.figure(figsize=(10, 5))
             plt.imshow(wordcloud_neg, interpolation='bilinear')
             plt.axis('off')
             st.pyplot(plt)
-    
+
+
             # Confusion Matrix dan Evaluasi
             if 'label' in df_new.columns:
                 df_eval = df_new.dropna(subset=['label'])
@@ -436,4 +470,3 @@ elif menu == "🏠 Dashboard":
     st.plotly_chart(fig2, use_container_width=True)
     
   
-
