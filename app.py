@@ -37,7 +37,7 @@ st.markdown("""
 
 # Navigasi Menu dengan Session State
 if "menu" not in st.session_state:
-    st.session_state.menu = "📈 Evaluasi Metrik"
+    st.session_state.menu = "🏠 Dashboard"
 
 col1, col2, col3, col4, col5, col6 = st.columns(6)
 with col1:
@@ -104,9 +104,54 @@ data = load_data()
 svm_model, tfidf = load_model_vectorizer()
 X_train, X_test, y_train, y_test, train_texts, test_texts = prepare_eval_data(data)
 
+# Menu: Dashboard
+if menu == "🏠 Dashboard":
+    st.subheader("🏠 Statistik Dataset Tiket.com")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Jumlah Ulasan", len(data))
+    with col2:
+        sentiment_counts = data['Sentimen'].value_counts()
+        fig = px.pie(names=sentiment_counts.index, values=sentiment_counts.values, title='Distribusi Sentimen')
+        st.plotly_chart(fig, use_container_width=True)
 
+    st.subheader("🔢 Distribusi Rating")
+    fig2 = px.histogram(data, x='score', nbins=5, title='Distribusi Skor Rating')
+    st.plotly_chart(fig2, use_container_width=True)
+
+    st.markdown("---")
+    st.subheader("📂 Data Latih & Data Uji")
+
+    # Data Latih
+    st.markdown("**🔹 Data Latih (Training Set)**")
+    st.write(f"Jumlah data latih: **{len(train_texts)}** ulasan")
+    st.dataframe(train_texts[['stemming', 'Sentimen']].head(50))
+
+    st.download_button(
+        label="📥 Unduh Data Latih",
+        data=train_texts.to_csv(index=False).encode('utf-8'),
+        file_name="data_latih.csv",
+        mime="text/csv"
+    )
+
+    # Garis pemisah
+    st.markdown("---")
+
+    # Data Uji
+    st.markdown("**🔹 Data Uji (Testing Set)**")
+    st.write(f"Jumlah data uji: **{len(test_texts)}** ulasan")
+    st.dataframe(test_texts[['stemming', 'Sentimen']].head(50))
+
+    st.download_button(
+        label="📥 Unduh Data Uji",
+        data=test_texts.to_csv(index=False).encode('utf-8'),
+        file_name="data_uji.csv",
+        mime="text/csv"
+    )
+
+    
 # Menu: Evaluasi Metrik
-if menu == "📈 Evaluasi Metrik":
+elif menu == "📈 Evaluasi Metrik":
     st.subheader("📈 Evaluasi Kinerja Model SVM")
     acc, prec, rec, f1, _, _ = evaluate_model(svm_model, X_test, y_test)
     metrics = ["Akurasi", "Presisi", "Recall", "F1-Score"]
@@ -454,19 +499,5 @@ elif menu == "🔍 Prediksi Ulasan Baru":
         st.info("ℹ️ Silakan unggah file terlebih dahulu.")
 
 
-# Menu: Dashboard
-elif menu == "🏠 Dashboard":
-    st.subheader("🏠 Statistik Dataset Tiket.com")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("Jumlah Ulasan", len(data))
-    with col2:
-        sentiment_counts = data['Sentimen'].value_counts()
-        fig = px.pie(names=sentiment_counts.index, values=sentiment_counts.values, title='Distribusi Sentimen')
-        st.plotly_chart(fig, use_container_width=True)
 
-    st.subheader("🔢 Distribusi Rating")
-    fig2 = px.histogram(data, x='score', nbins=5, title='Distribusi Skor Rating')
-    st.plotly_chart(fig2, use_container_width=True)
-    
   
